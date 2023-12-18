@@ -4,14 +4,7 @@
 
 #include "menu.h"
 
-int main()
-{
-    clearScreen();
-    displayMenu();
-    return 0;
-}
-
-void displayMenu()
+void displayMenu(PGconn *conn)
 {
     printf("1. Prisijungti kaip administratorius\n");
     printf("2. Prisijungti kaip vartotojas\n");
@@ -26,7 +19,7 @@ void displayMenu()
     switch (choice)
     {
     case 1:
-        adminMenu();
+        adminMenu(conn);
         break;
     case 2:
         // userLogin();
@@ -40,15 +33,17 @@ void displayMenu()
     }
 }
 
-void adminMenu() 
+void adminMenu(PGconn *conn) 
 {
     clearScreen();
 
     printf("1. Perziureti vartotojus\n");
-    printf("2. Prideti kategorija\n");
-    printf("3. Prideti preke\n");
-    printf("4. Perziureti preke(-es)\n");
-    printf("5. Iseiti\n");
+    printf("2. Perziureti kategorijas\n");
+    printf("3. Prideti kategorija\n");
+    printf("4. Perziureti produktus\n");
+    printf("5. Prideti produkta\n");
+    // printf("4. Perziureti preke(-es)\n");
+    printf("0. Iseiti\n");
 
     printf("Pasirinkite: ");
 
@@ -60,19 +55,25 @@ void adminMenu()
     {
     case 1:
         clearScreen();
-        displayUsers();
+        displayUsers(conn);
         break;
     case 2:
         clearScreen();
-        // addCategory();
+        displayCategories(conn);
+        waitForInput();
+        adminMenu(conn);
         break;
     case 3:
         clearScreen();
-        // addProduct();
+        addCategory(conn);
         break;
     case 4:
         clearScreen();
-        // productsMenu();
+        displayProducts(conn);
+        break;
+    case 5:
+        clearScreen();
+        addProduct(conn);
         break;
     default:
         exit(0);
@@ -80,7 +81,74 @@ void adminMenu()
     }
 }
 
+void displayUsers(PGconn *conn) 
+{
+    displayUserList(conn);
+    waitForInput();
+    clearScreen();
+    adminMenu(conn);
+}
+
+void displayCategories(PGconn *conn)
+{
+    displayCategoryList(conn);
+}
+
+void displayProducts(PGconn *conn)
+{
+    displayProductList(conn);
+    waitForInput();
+    clearScreen();
+    adminMenu(conn);
+}
+
+void addCategory(PGconn *conn)
+{
+    char name[255];
+
+    printf("Iveskite kategorijos pavadinima: ");
+    scanf("%s", name);
+    printf("%s\n", name);
+    waitForInput();
+
+    addNewCategory(conn, name);
+    waitForInput();
+    adminMenu(conn);
+}
+
+void addProduct(PGconn *conn)
+{
+    printf("Pasirinkite produkto kategorija is saraso:\n");
+    displayCategoryList(conn);
+    printf("Iveskite kategorijos numeri, kuri noretumet panaudoti: ");
+    int category;
+    scanf("%d", &category);
+
+    printf("Iveskite produkto pavadinima: ");
+    char name[255];
+    scanf("%s", name);
+
+    printf("Iveskite produkto kaina: ");
+    float price;
+    scanf("%f", &price);
+
+    printf("Iveskite produkto kieki: ");
+    int quantity;
+    scanf("%d", &quantity);
+
+    addNewProduct(conn, category, name, price, quantity);
+    waitForInput();
+    adminMenu(conn);
+}
+
 void clearScreen()
 {
     printf("\e[1;1H\e[2J");
+}
+
+void waitForInput() 
+{
+    printf("Press enter to continue...");
+    while (getchar() != '\n');  // Wait for Enter key press
+    getchar();  // Consume the newline character
 }

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "sql.h"
 #include "messages.h"
@@ -120,4 +121,24 @@ void printInsertResult(PGconn *conn, const char *query, const char *text)
     printf("%s\n", text);
 
     PQclear(res);
+}
+
+bool isValidCategory(PGconn *conn, int categoryID)
+{
+    char query[100];
+    sprintf(query, "SELECT EXISTS(SELECT 1 FROM kategorija WHERE kategorijos_id = %d);", categoryID);
+    PGresult *res = PQexec(conn, query);
+
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "Query failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return false;
+    }
+
+    if (strcmp(PQgetvalue(res, 0, 0), "t") == 0) {
+        return true;
+    } else {
+        printf("Tokios kategorijos nera. Bandykite dar karta. \n");
+        return false;
+    }
 }

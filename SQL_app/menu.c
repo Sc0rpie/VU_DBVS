@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "menu.h"
 
@@ -104,12 +105,11 @@ void displayProducts(PGconn *conn)
 
 void addCategory(PGconn *conn)
 {
-    char name[255];
+    char *name;
 
     printf("Iveskite kategorijos pavadinima: ");
-    scanf("%s", name);
-    printf("%s\n", name);
-    waitForInput();
+
+    name = getStringInput();
 
     addNewCategory(conn, name);
     waitForInput();
@@ -120,13 +120,20 @@ void addProduct(PGconn *conn)
 {
     printf("Pasirinkite produkto kategorija is saraso:\n");
     displayCategoryList(conn);
-    printf("Iveskite kategorijos numeri, kuri noretumet panaudoti: ");
+
     int category;
-    scanf("%d", &category);
+    bool validCategory = false;
+    while (!validCategory)
+    {
+        printf("Iveskite kategorijos numeri, kuri noretumet panaudoti: ");
+        scanf("%d", &category);
+        validCategory = isValidCategory(conn, category);
+    }
+    // scanf("%d", &category);
 
     printf("Iveskite produkto pavadinima: ");
-    char name[255];
-    scanf("%s", name);
+    char *name;
+    name = getStringInput();
 
     printf("Iveskite produkto kaina: ");
     float price;
@@ -148,7 +155,17 @@ void clearScreen()
 
 void waitForInput() 
 {
+    fflush(stdin); // clear input buffer (stdin)
     printf("Press enter to continue...");
     while (getchar() != '\n');  // Wait for Enter key press
-    getchar();  // Consume the newline character
+}
+
+char *getStringInput()
+{
+    char *input = malloc(sizeof(char) * 255);
+    fflush(stdin); // clear input buffer (stdin)
+    fgets(input, 255, stdin);
+    if ((strlen(input) > 0) && (input[strlen (input) - 1] == '\n'))
+        input[strlen (input) - 1] = '\0';
+    return input;
 }

@@ -19,5 +19,6 @@ void addProduct(PGconn *conn);
 // Helper functions
 void clearScreen();
 void waitForInput();
+char *getStringInput();
 
 #endif

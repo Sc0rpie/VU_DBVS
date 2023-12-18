@@ -20,4 +20,7 @@ void addNewProduct(PGconn *conn, int categoryID, char *productName, float price,
 void printQueryResults(PGconn *conn, const char *query, const char *noResultsMessage);
 void printInsertResult(PGconn *conn, const char *query, const char *text);
 
+// Helper functions
+bool isValidCategory(PGconn *conn, int categoryID);
+
 #endif

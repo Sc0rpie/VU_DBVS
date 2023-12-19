@@ -9,7 +9,7 @@ int main()
     PGconn *conn;
 
     conn = connectToDatabase();
-    clearScreen();
+    // clearScreen();
     displayMenu(conn);
     return 0;
 }

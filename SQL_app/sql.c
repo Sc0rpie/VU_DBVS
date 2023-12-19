@@ -60,6 +60,26 @@ void addNewProduct(PGconn *conn, int categoryID, char *productName, float price,
     printInsertResult(conn, query, "Produktas pridetas!");
 }
 
+void updateProductPrice(PGconn *conn, int productID, float price)
+{
+    char updateQuery[256];
+    sprintf(updateQuery, "UPDATE produktas SET kaina = %f WHERE produkto_id = %d;", price, productID);
+    printInsertResult(conn, updateQuery, "Produkto kaina atnaujinta!");
+}
+
+void registerNewUser(PGconn *conn, char *name, char *surname)
+{
+    char *fullName = malloc(strlen(name) + strlen(surname) + 1);
+    strcpy(fullName, name);
+    strcat(fullName, " ");
+    strcat(fullName, surname);
+
+    char query[256];
+    sprintf(query, "INSERT INTO klientas (vardas_pavarde) VALUES ('%s');", fullName);
+    printInsertResult(conn, query, "Vartotojas pridetas!");
+    free(fullName);
+}
+
 void printQueryResults(PGconn *conn, const char *query, const char *noResultsMessage) 
 {
     PGresult *res = PQexec(conn, query);
@@ -139,6 +159,26 @@ bool isValidCategory(PGconn *conn, int categoryID)
         return true;
     } else {
         printf("Tokios kategorijos nera. Bandykite dar karta. \n");
+        return false;
+    }
+}
+
+bool isValidProduct(PGconn *conn, int productID)
+{
+    char query[100];
+    sprintf(query, "SELECT EXISTS(SELECT 1 FROM produktas WHERE produkto_id = %d);", productID);
+    PGresult *res = PQexec(conn, query);
+
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "Query failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return false;
+    }
+
+    if (strcmp(PQgetvalue(res, 0, 0), "t") == 0) {
+        return true;
+    } else {
+        printf("Tokio produkto nera. Bandykite dar karta. \n");
         return false;
     }
 }

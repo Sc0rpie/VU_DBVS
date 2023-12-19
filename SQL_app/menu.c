@@ -7,6 +7,7 @@
 
 void displayMenu(PGconn *conn)
 {
+    clearScreen();
     printf("1. Prisijungti kaip administratorius\n");
     printf("2. Prisijungti kaip vartotojas\n");
     printf("3. Registruotis kaip vartotojas\n");
@@ -26,7 +27,7 @@ void displayMenu(PGconn *conn)
         // userLogin();
         break;
     case 3:
-        // registerUser();
+        registerUser(conn);
         break;
     default:
         exit(0);
@@ -43,7 +44,7 @@ void adminMenu(PGconn *conn)
     printf("3. Prideti kategorija\n");
     printf("4. Perziureti produktus\n");
     printf("5. Prideti produkta\n");
-    // printf("4. Perziureti preke(-es)\n");
+    printf("6. Atnaujinti produkto kaina\n");
     printf("0. Iseiti\n");
 
     printf("Pasirinkite: ");
@@ -76,6 +77,9 @@ void adminMenu(PGconn *conn)
         clearScreen();
         addProduct(conn);
         break;
+    case 6:
+        clearScreen();
+        updatePrice(conn);
     default:
         exit(0);
         break;
@@ -147,6 +151,47 @@ void addProduct(PGconn *conn)
     waitForInput();
     adminMenu(conn);
 }
+
+void updatePrice(PGconn *conn)
+{
+    printf("Pasirinkite produkta is saraso:\n");
+    displayProductList(conn);
+
+    int product;
+    bool validProduct = false;
+    while (!validProduct)
+    {
+        printf("Iveskite produkto numeri, kurio kaina bus atnaujinta: ");
+        scanf("%d", &product);
+        validProduct = isValidProduct(conn, product);
+    }
+
+    printf("Iveskite nauja produkto kaina: ");
+    float price;
+    scanf("%f", &price);
+
+    updateProductPrice(conn, product, price);
+    waitForInput();
+    adminMenu(conn);
+}
+
+void registerUser(PGconn *conn)
+{
+    char *name;
+    char *surname;
+
+    printf("Iveskite savo varda: ");
+    name = getStringInput();
+
+    printf("Iveskite savo pavarde: ");
+    surname = getStringInput();
+
+    registerNewUser(conn, name, surname);
+    waitForInput();
+    displayMenu(conn);
+}
+
+
 
 void clearScreen()
 {

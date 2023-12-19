@@ -6,6 +6,9 @@
 // Menus
 void displayMenu(PGconn *conn);
 void adminMenu(PGconn *conn);
+void userLogin(PGconn *conn);
+void registerUser(PGconn *conn);
+void userMenu(PGconn *conn);
 
 // Display functions
 void displayUsers(PGconn *conn);
@@ -15,6 +18,10 @@ void displayProducts(PGconn *conn);
 // Insert functions
 void addCategory(PGconn *conn);
 void addProduct(PGconn *conn);
+void registerUser(PGconn *conn);
+
+// Update functions
+void updatePrice(PGconn *conn);
 
 // Helper functions
 void clearScreen();

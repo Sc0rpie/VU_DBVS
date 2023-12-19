@@ -43,6 +43,21 @@ void displayProductList(PGconn *conn)
     printQueryResults(conn, "SELECT * FROM produktas;", getMessage(MSG_NO_PRODUCTS));
 }
 
+void displayOrderList(PGconn *conn, int userID)
+{
+    char query[1024];
+    sprintf(query, 
+        "SELECT k.pavadinimas AS Kategorija, p.pavadinimas AS ProduktoPavadinimas, p.kaina AS Kaina, pi.kiekis AS Kiekis "
+        "FROM pardavimo_informacija pi "
+        "JOIN pardavimas pa ON pi.pardavimo_nr = pa.pardavimo_id "
+        "JOIN produktas p ON pi.produkto_nr = p.produkto_id "
+        "JOIN kategorija k ON p.kategorijos_nr = k.kategorijos_id "
+        "WHERE pa.kliento_nr = %d;", 
+        userID);
+
+    printQueryResults(conn, query, getMessage(MSG_NO_ORDERS));
+}
+
 void addNewCategory(PGconn *conn, char *categoryName)
 {
     char query[100];
@@ -60,11 +75,83 @@ void addNewProduct(PGconn *conn, int categoryID, char *productName, float price,
     printInsertResult(conn, query, "Produktas pridetas!");
 }
 
+void addNewOrder(PGconn *conn, int userID, int productID, int quantity)
+{
+    printf("userID: %d\n", userID);
+    printf("productID: %d\n", productID);
+    printf("quantity: %d\n", quantity);
+    PQexec(conn, "BEGIN;");
+
+    // Fetching product price
+    char fetchPriceQuery[256];
+    sprintf(fetchPriceQuery, "SELECT kaina FROM produktas WHERE produkto_id = %d;", productID);
+    PGresult *res = PQexec(conn, fetchPriceQuery);
+
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "Nepavyko gauti produkto kainos: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        PQexec(conn, "ROLLBACK;");
+        return;
+    }
+
+    float price = atof(PQgetvalue(res, 0, 0));
+    float pajamos = price * quantity;
+    PQclear(res);
+
+    char insertOrderQuery[256];
+    sprintf(insertOrderQuery, "INSERT INTO pardavimas (kliento_nr, pardavimo_data, pajamos) VALUES (%d, CURRENT_TIMESTAMP, %f) RETURNING pardavimo_id;", userID, pajamos);
+    printf("%s\n", insertOrderQuery);
+    res = PQexec(conn, insertOrderQuery);
+
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "Insert into pardavimas failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        PQexec(conn, "ROLLBACK;");
+        return;
+    }
+
+    printf("Pardavimas pridetas!\n");
+    // Retrieve the new pardavimo_id
+    int newPardavimoId = atoi(PQgetvalue(res, 0, 0));
+    PQclear(res);
+
+    printf("Pardavimo ID: %d\n", newPardavimoId);
+    // Insert a corresponding row into pardavimo_informacija
+    char insertPardavimoInfoQuery[256];
+    sprintf(insertPardavimoInfoQuery, "INSERT INTO pardavimo_informacija (pardavimo_nr, produkto_nr, kiekis) VALUES (%d, %d, %d);", newPardavimoId, productID, quantity);
+    res = PQexec(conn, insertPardavimoInfoQuery);
+
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Insert into pardavimo_informacija failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        PQexec(conn, "ROLLBACK;");
+        return;
+    }
+    PQclear(res);
+
+    // Commit the transaction
+    PQexec(conn, "COMMIT;");
+
+}
+
 void updateProductPrice(PGconn *conn, int productID, float price)
 {
     char updateQuery[256];
     sprintf(updateQuery, "UPDATE produktas SET kaina = %f WHERE produkto_id = %d;", price, productID);
     printInsertResult(conn, updateQuery, "Produkto kaina atnaujinta!");
+}
+
+void changeUserName(PGconn *conn, int userID, char *name, char *surname)
+{
+    char *fullName = malloc(strlen(name) + strlen(surname) + 1);
+    strcpy(fullName, name);
+    strcat(fullName, " ");
+    strcat(fullName, surname);
+
+    char updateQuery[256];
+    sprintf(updateQuery, "UPDATE klientas SET vardas_pavarde = '%s' WHERE kliento_id = %d;", fullName, userID);
+    printInsertResult(conn, updateQuery, "Vartotojo vardas atnaujintas!");
+    free(fullName);
 }
 
 void registerNewUser(PGconn *conn, char *name, char *surname)
@@ -78,6 +165,13 @@ void registerNewUser(PGconn *conn, char *name, char *surname)
     sprintf(query, "INSERT INTO klientas (vardas_pavarde) VALUES ('%s');", fullName);
     printInsertResult(conn, query, "Vartotojas pridetas!");
     free(fullName);
+}
+
+void deleteUserData(PGconn *conn, int userID)
+{
+    char query[256];
+    sprintf(query, "DELETE FROM klientas WHERE kliento_id = %d;", userID);
+    printInsertResult(conn, query, "Vartotojas istrintas!");
 }
 
 void printQueryResults(PGconn *conn, const char *query, const char *noResultsMessage) 
@@ -181,4 +275,43 @@ bool isValidProduct(PGconn *conn, int productID)
         printf("Tokio produkto nera. Bandykite dar karta. \n");
         return false;
     }
+}
+
+int loginCheck(PGconn *conn, char *name, char *surname)
+{
+    char *fullName = malloc(strlen(name) + strlen(surname) + 1);
+    strcpy(fullName, name);
+    strcat(fullName, " ");
+    strcat(fullName, surname);
+
+    char query[256];
+    sprintf(query, "SELECT kliento_id FROM klientas WHERE lower(vardas_pavarde) = lower('%s');", fullName);
+    PGresult *res = PQexec(conn, query);
+
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "Query failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return -1;
+    }
+
+    if (PQntuples(res) == 0) {
+        return -1;
+    } else {
+        return atoi(PQgetvalue(res, 0, 0));
+    }
+}
+
+char *getNameByID(PGconn *conn, int id)
+{
+    char query[256];
+    sprintf(query, "SELECT vardas_pavarde FROM klientas WHERE kliento_id = %d;", id);
+    PGresult *res = PQexec(conn, query);
+
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "Query failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return NULL;
+    }
+
+    return PQgetvalue(res, 0, 0);
 }

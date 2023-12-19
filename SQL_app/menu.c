@@ -24,7 +24,7 @@ void displayMenu(PGconn *conn)
         adminMenu(conn);
         break;
     case 2:
-        // userLogin();
+        userLogin(conn);
         break;
     case 3:
         registerUser(conn);
@@ -173,6 +173,154 @@ void updatePrice(PGconn *conn)
     updateProductPrice(conn, product, price);
     waitForInput();
     adminMenu(conn);
+}
+
+void userLogin(PGconn *conn)
+{
+    char *name;
+    char *surname;
+    int userID = -1;
+
+    printf("Iveskite savo varda: ");
+    name = getStringInput();
+
+    printf("Iveskite savo pavarde: ");
+    surname = getStringInput();
+
+    while (userID == -1)
+    {
+        userID = loginCheck(conn, name, surname);
+        if (userID == -1)
+        {
+            printf("Tokio vartotojo nera. Bandykite dar karta.\n");
+            printf("Iveskite savo varda: ");
+            name = getStringInput();
+
+            printf("Iveskite savo pavarde: ");
+            surname = getStringInput();
+        }
+    }
+    waitForInput();
+    userMenu(conn, userID);
+
+}
+
+void userMenu(PGconn *conn, int userID)
+{
+    clearScreen();
+    char *fullName = getNameByID(conn, userID);
+
+    printf("Sveiki, %s!\n", fullName);
+    printf("1. Perziureti prekes\n");
+    printf("2. Sukurti uzsakyma\n");
+    printf("3. Perziureti padarytus uzsakymus\n");
+    printf("4. Perziureti lojalumo tasku kieki\n");
+    printf("5. Pakeisti varda\n");
+    printf("6. Istrinti paskyra\n");
+    printf("0. Iseiti\n");
+
+    printf("Pasirinkite: ");
+    int choice;
+    scanf("%d", &choice);
+
+    switch (choice)
+    {
+        case 1:
+            clearScreen();
+            displayProductList(conn);
+            waitForInput();
+            userMenu(conn, userID);
+            break;
+        case 2:
+            clearScreen();
+            makeOrder(conn, userID);
+            userMenu(conn, userID);
+            break;
+        case 3:
+            displayOrders(conn, userID);
+            // waitForInput();
+            userMenu(conn, userID);
+            // displayLoyaltyPoints(conn, userID);
+            break;
+        case 4:
+            // displayLoyaltyPoints(conn, userID);
+            break;
+        case 5:
+            changeName(conn, userID);
+            break;
+        case 6:
+            deleteUser(conn, userID);
+        default:
+            exit(0);
+            break;
+    }
+}
+
+void makeOrder(PGconn *conn, int userID)
+{
+    printf("Pasirinkite produkta is saraso:\n");
+    displayProductList(conn);
+
+    int product;
+    bool validProduct = false;
+    while (!validProduct)
+    {
+        printf("Iveskite produkto numeri, kuri norite isigyti: ");
+        scanf("%d", &product);
+        validProduct = isValidProduct(conn, product);
+    }
+
+    printf("Iveskite produkto kieki: ");
+    int quantity;
+    scanf("%d", &quantity);
+
+    addNewOrder(conn, userID, product, quantity);
+    waitForInput();
+    userMenu(conn, userID);
+}
+
+void changeName(PGconn *conn, int userID)
+{
+    clearScreen();
+    char *name;
+    char *surname;
+
+    printf("Iveskite nauja varda: ");
+    name = getStringInput();
+
+    printf("Iveskite nauja pavarde: ");
+    surname = getStringInput();
+
+    changeUserName(conn, userID, name, surname);
+    waitForInput();
+    free(name);
+    free(surname);
+    userMenu(conn, userID);
+}
+
+void deleteUser(PGconn *conn, int userID)
+{
+    clearScreen();
+    printf("Ar tikrai norite istrinti savo paskyra? (y/n)\n");
+    char *choice = getStringInput();
+    if (strcmp(choice, "y") == 0)
+    {
+        deleteUserData(conn, userID);
+        waitForInput();
+        displayMenu(conn);
+    }
+    else
+    {
+        userMenu(conn, userID);
+    }
+}
+
+void displayOrders(PGconn *conn, int userID)
+{
+    clearScreen();
+    displayOrderList(conn, userID);
+    waitForInput();
+    userMenu(conn, userID);
 }
 
 void registerUser(PGconn *conn)

@@ -25,7 +25,7 @@ void updateProductPrice(PGconn *conn, int productID, float newPrice);
 void changeUserName(PGconn *conn, int userID, char *name, char *surname);
 
 // Delete functions
-void deleteUserData(PGconn *conn, int userID);
+bool deleteUserData(PGconn *conn, int userID);
 
 // Printing functions
 void printQueryResults(PGconn *conn, const char *query, const char *noResultsMessage);
@@ -36,5 +36,6 @@ bool isValidCategory(PGconn *conn, int categoryID);
 bool isValidProduct(PGconn *conn, int productID);
 int loginCheck(PGconn *conn, char *name, char *surname);
 char *getNameByID(PGconn *conn, int id);
+int getLoyaltyPoints(PGconn *conn, int userID);
 
 #endif

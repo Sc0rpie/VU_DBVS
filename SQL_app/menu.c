@@ -10,7 +10,7 @@ void displayMenu(PGconn *conn)
     clearScreen();
     printf("1. Prisijungti kaip administratorius\n");
     printf("2. Prisijungti kaip vartotojas\n");
-    printf("3. Registruotis kaip vartotojas\n");
+    printf("3. Registruotis\n");
     printf("4. Iseiti\n");
 
     printf("Pasirinkite: ");
@@ -238,12 +238,9 @@ void userMenu(PGconn *conn, int userID)
             break;
         case 3:
             displayOrders(conn, userID);
-            // waitForInput();
-            userMenu(conn, userID);
-            // displayLoyaltyPoints(conn, userID);
             break;
         case 4:
-            // displayLoyaltyPoints(conn, userID);
+            displayLoyaltyPoints(conn, userID);
             break;
         case 5:
             changeName(conn, userID);
@@ -305,9 +302,16 @@ void deleteUser(PGconn *conn, int userID)
     char *choice = getStringInput();
     if (strcmp(choice, "y") == 0)
     {
-        deleteUserData(conn, userID);
-        waitForInput();
-        displayMenu(conn);
+        if (!deleteUserData(conn, userID))
+        {
+            printf("Klaida istrinant paskyra.\n");
+            waitForInput();
+            userMenu(conn, userID);
+        } else {
+            printf("Paskyra istrinta.\n");
+            waitForInput();
+            displayMenu(conn);
+        }
     }
     else
     {
@@ -319,6 +323,14 @@ void displayOrders(PGconn *conn, int userID)
 {
     clearScreen();
     displayOrderList(conn, userID);
+    waitForInput();
+    userMenu(conn, userID);
+}
+
+void displayLoyaltyPoints(PGconn *conn, int userID)
+{
+    clearScreen();
+    printf("Jusu lojalumo tasku kiekis: %d\n", getLoyaltyPoints(conn, userID));
     waitForInput();
     userMenu(conn, userID);
 }

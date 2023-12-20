@@ -47,7 +47,7 @@ void displayOrderList(PGconn *conn, int userID)
 {
     char query[1024];
     sprintf(query, 
-        "SELECT k.pavadinimas AS Kategorija, p.pavadinimas AS ProduktoPavadinimas, p.kaina AS Kaina, pi.kiekis AS Kiekis "
+        "SELECT k.pavadinimas AS Kategorija, p.pavadinimas AS Produkto_Pavadinimas, p.kaina AS Kaina, pi.kiekis AS Kiekis "
         "FROM pardavimo_informacija pi "
         "JOIN pardavimas pa ON pi.pardavimo_nr = pa.pardavimo_id "
         "JOIN produktas p ON pi.produkto_nr = p.produkto_id "
@@ -60,26 +60,69 @@ void displayOrderList(PGconn *conn, int userID)
 
 void addNewCategory(PGconn *conn, char *categoryName)
 {
-    char query[100];
-    sprintf(query, "INSERT INTO kategorija (pavadinimas) VALUES ('%s');", categoryName);
-    printf("%s\n", query);
-    printf("%s\n", categoryName);
-    printInsertResult(conn, query, "Kategorija prideta!");
+    // char query[100];
+    const char *paramValues[1] = { categoryName };
+    PGresult *res = PQexecParams(conn, 
+                                "INSERT INTO kategorija (pavadinimas) VALUES ($1);",
+                                1,       /* one param */
+                                NULL,    /* let the library deduce param type */
+                                paramValues,
+                                NULL,    /* don't need param lengths since text */
+                                NULL,    /* default to all text params */
+                                0);      /* ask for binary results */
+
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Insert category failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+
+    printf("Pakeistu eiluciu skaicius: %s\n", PQcmdTuples(res));
+    printf("Kategorija prideta!\n");
+    // sprintf(query, "INSERT INTO kategorija (pavadinimas) VALUES ('%s');", categoryName);
+    // printf("%s\n", query);
+    // printf("%s\n", categoryName);
+    // printInsertResult(conn, query, "Kategorija prideta!");
 }
 
 void addNewProduct(PGconn *conn, int categoryID, char *productName, float price, int quantity)
 {
-    char query[255];
-    sprintf(query, "INSERT INTO produktas (kategorijos_nr, pavadinimas, kaina, kiekis) VALUES (%d, '%s', %f, %d);", categoryID, productName, price, quantity);
-    printf("%s\n", query);
-    printInsertResult(conn, query, "Produktas pridetas!");
+    const char *paramValues[4];
+    char categoryIDStr[12], priceStr[12], quantityStr[12];
+
+    // Convert integer and float values to strings
+    sprintf(categoryIDStr, "%d", categoryID);
+    sprintf(priceStr, "%.2f", price);
+    sprintf(quantityStr, "%d", quantity);
+
+    paramValues[0] = categoryIDStr;
+    paramValues[1] = productName;
+    paramValues[2] = priceStr;
+    paramValues[3] = quantityStr;
+
+    PGresult *res = PQexecParams(conn, 
+                                "INSERT INTO produktas (kategorijos_nr, pavadinimas, kaina, kiekis) VALUES ($1, $2, $3, $4);",
+                                4, NULL, paramValues, NULL, NULL, 0);
+
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Insert category failed: %s", PQerrorMessage(conn));
+        PQclear(res);
+        return;
+    }
+
+    printf("Pakeistu eiluciu skaicius: %s\n", PQcmdTuples(res));
+    printf("Produktas pridetas!\n");
+    // char query[255];
+    // sprintf(query, "INSERT INTO produktas (kategorijos_nr, pavadinimas, kaina, kiekis) VALUES (%d, '%s', %f, %d);", categoryID, productName, price, quantity);
+    // // printf("%s\n", query);
+    // printInsertResult(conn, query, "Produktas pridetas!");
 }
 
 void addNewOrder(PGconn *conn, int userID, int productID, int quantity)
 {
-    printf("userID: %d\n", userID);
-    printf("productID: %d\n", productID);
-    printf("quantity: %d\n", quantity);
+    // printf("userID: %d\n", userID);
+    // printf("productID: %d\n", productID);
+    // printf("quantity: %d\n", quantity);
     PQexec(conn, "BEGIN;");
 
     // Fetching product price
@@ -100,7 +143,7 @@ void addNewOrder(PGconn *conn, int userID, int productID, int quantity)
 
     char insertOrderQuery[256];
     sprintf(insertOrderQuery, "INSERT INTO pardavimas (kliento_nr, pardavimo_data, pajamos) VALUES (%d, CURRENT_TIMESTAMP, %f) RETURNING pardavimo_id;", userID, pajamos);
-    printf("%s\n", insertOrderQuery);
+    // printf("%s\n", insertOrderQuery);
     res = PQexec(conn, insertOrderQuery);
 
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
@@ -110,7 +153,7 @@ void addNewOrder(PGconn *conn, int userID, int productID, int quantity)
         return;
     }
 
-    printf("Pardavimas pridetas!\n");
+    // printf("Pardavimas pridetas!\n");
     // Retrieve the new pardavimo_id
     int newPardavimoId = atoi(PQgetvalue(res, 0, 0));
     PQclear(res);
@@ -127,6 +170,7 @@ void addNewOrder(PGconn *conn, int userID, int productID, int quantity)
         PQexec(conn, "ROLLBACK;");
         return;
     }
+    
     PQclear(res);
 
     // Commit the transaction
@@ -143,35 +187,130 @@ void updateProductPrice(PGconn *conn, int productID, float price)
 
 void changeUserName(PGconn *conn, int userID, char *name, char *surname)
 {
-    char *fullName = malloc(strlen(name) + strlen(surname) + 1);
-    strcpy(fullName, name);
-    strcat(fullName, " ");
-    strcat(fullName, surname);
+    if (name == NULL || surname == NULL || strlen(name) == 0 || strlen(surname) == 0) {
+        fprintf(stderr, "Vardas arba pavarde negali buti tuscias.\n");
+        return;
+    }
+    char *fullName = malloc(strlen(name) + strlen(surname) + 2); // +2 for space and null-terminator
+    sprintf(fullName, "%s %s", name, surname);
 
-    char updateQuery[256];
-    sprintf(updateQuery, "UPDATE klientas SET vardas_pavarde = '%s' WHERE kliento_id = %d;", fullName, userID);
-    printInsertResult(conn, updateQuery, "Vartotojo vardas atnaujintas!");
+    const char *paramValues[2];
+    char userIDStr[12];
+
+    sprintf(userIDStr, "%d", userID);
+    paramValues[0] = fullName;
+    paramValues[1] = userIDStr;
+
+    PGresult *res = PQexecParams(conn, 
+                                "UPDATE klientas SET vardas_pavarde = $1 WHERE kliento_id = $2;",
+                                2, NULL, paramValues, NULL, NULL, 0);
+
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Vardo pakeitimas nepavyko: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        PQexec(conn, "ROLLBACK;");
+        return;
+    }
+
+    printf("Pakeistu eiluciu skaicius: %s\n", PQcmdTuples(res));
+    printf("Vartotojo vardas atnaujintas!\n");
+
     free(fullName);
+    // char *fullName = malloc(strlen(name) + strlen(surname) + 1);
+    // strcpy(fullName, name);
+    // strcat(fullName, " ");
+    // strcat(fullName, surname);
+
+    // char updateQuery[256];
+    // sprintf(updateQuery, "UPDATE klientas SET vardas_pavarde = '%s' WHERE kliento_id = %d;", fullName, userID);
+    // printInsertResult(conn, updateQuery, "Vartotojo vardas atnaujintas!");
+    // free(fullName);
 }
 
 void registerNewUser(PGconn *conn, char *name, char *surname)
 {
-    char *fullName = malloc(strlen(name) + strlen(surname) + 1);
-    strcpy(fullName, name);
-    strcat(fullName, " ");
-    strcat(fullName, surname);
+    if (name == NULL || surname == NULL || strlen(name) == 0 || strlen(surname) == 0) {
+        fprintf(stderr, "Vardas arba pavarde negali buti tuscias.\n");
+        return;
+    }
+    char *fullName = malloc(strlen(name) + strlen(surname) + 2); // +2 for space and null-terminator
+    sprintf(fullName, "%s %s", name, surname);
 
-    char query[256];
-    sprintf(query, "INSERT INTO klientas (vardas_pavarde) VALUES ('%s');", fullName);
-    printInsertResult(conn, query, "Vartotojas pridetas!");
+    const char *paramValues[1] = { fullName };
+
+    PGresult *res = PQexecParams(conn, 
+                                "INSERT INTO klientas (vardas_pavarde) VALUES ($1);",
+                                1, NULL, paramValues, NULL, NULL, 0);
+
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Insert into pardavimo_informacija failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        PQexec(conn, "ROLLBACK;");
+        return;
+    }
+
+    printf("Pakeistu eiluciu skaicius: %s\n", PQcmdTuples(res));
+    printf("Vartotojas pridetas!\n");
+
     free(fullName);
+    // char *fullName = malloc(strlen(name) + strlen(surname) + 1);
+    // strcpy(fullName, name);
+    // strcat(fullName, " ");
+    // strcat(fullName, surname);
+
+    // char query[256];
+    // sprintf(query, "INSERT INTO klientas (vardas_pavarde) VALUES ('%s');", fullName);
+    // printInsertResult(conn, query, "Vartotojas pridetas!");
+    // free(fullName);
 }
 
-void deleteUserData(PGconn *conn, int userID)
+bool deleteUserData(PGconn *conn, int userID)
 {
-    char query[256];
-    sprintf(query, "DELETE FROM klientas WHERE kliento_id = %d;", userID);
-    printInsertResult(conn, query, "Vartotojas istrintas!");
+    PQexec(conn, "BEGIN;");
+
+    // Delete rows from pardavimo_informacija
+    char deletePardavimoInfoQuery[256];
+    sprintf(deletePardavimoInfoQuery, "DELETE FROM pardavimo_informacija WHERE pardavimo_nr IN (SELECT pardavimo_id FROM pardavimas WHERE kliento_nr = %d);", userID);
+    PGresult *res = PQexec(conn, deletePardavimoInfoQuery);
+
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Delete from pardavimo_informacija failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        PQexec(conn, "ROLLBACK;");
+        return false;
+    }
+    PQclear(res);
+
+    // Delete rows from pardavimas
+    char deletePardavimasQuery[256];
+    sprintf(deletePardavimasQuery, "DELETE FROM pardavimas WHERE kliento_nr = %d;", userID);
+    res = PQexec(conn, deletePardavimasQuery);
+
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "Delete from pardavimas failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        PQexec(conn, "ROLLBACK;");
+        return false;
+    }
+    PQclear(res);
+
+    // Delete rows from klientas
+    char deleteKlientasQuery[256];
+    sprintf(deleteKlientasQuery, "DELETE FROM klientas WHERE kliento_id = %d;", userID);
+    res = PQexec(conn, deleteKlientasQuery);
+    printf("Pakeistu eiluciu skaicius: %s\n", PQcmdTuples(res));
+
+    if (PQresultStatus(res) != PGRES_COMMAND_OK || atoi(PQcmdTuples(res)) == 0) {
+        fprintf(stderr, "Delete from klientas failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        PQexec(conn, "ROLLBACK;");
+        return false;
+    }
+
+    PQclear(res);
+    // Commit the transaction
+    PQexec(conn, "COMMIT;");
+    return true;
 }
 
 void printQueryResults(PGconn *conn, const char *query, const char *noResultsMessage) 
@@ -226,12 +365,13 @@ void printInsertResult(PGconn *conn, const char *query, const char *text)
 {
     PGresult *res = PQexec(conn, query);
 
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+    if (PQresultStatus(res) != PGRES_COMMAND_OK || atoi(PQcmdTuples(res)) == 0) {
         fprintf(stderr, "Neteisinga uzklausa: %s\n", PQerrorMessage(conn));
         PQclear(res);
         return;
     }
 
+    printf("Pakeistu eiluciu skaicius: %s\n", PQcmdTuples(res));
     printf("%s\n", text);
 
     PQclear(res);
@@ -314,4 +454,19 @@ char *getNameByID(PGconn *conn, int id)
     }
 
     return PQgetvalue(res, 0, 0);
+}
+
+int getLoyaltyPoints(PGconn *conn, int userID)
+{
+    char query[256];
+    sprintf(query, "SELECT lojalumo_taskai FROM klientas WHERE kliento_id = %d;", userID);
+    PGresult *res = PQexec(conn, query);
+
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "Query failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return -1;
+    }
+
+    return atoi(PQgetvalue(res, 0, 0));
 }

@@ -15,6 +15,7 @@ void displayUsers(PGconn *conn);
 void displayCategories(PGconn *conn);
 void displayProducts(PGconn *conn);
 void displayOrders(PGconn *conn, int userID);
+void displayLoyaltyPoints(PGconn *conn, int userID);
 
 // Insert functions
 void addCategory(PGconn *conn);
